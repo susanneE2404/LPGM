@@ -4,7 +4,7 @@ Power simulations for PRISMA: latent profile growth model of school readiness, i
 Folders:
 - "Scripts" contains R-scripts for data simulations, analyses of simulated data and analyses of simulation results
 
-- Files:
+Files:
 -   Step1_Creating_Simulated_Data_sets_LPGM.Rmd Create simulated data sets via MplusAutomation
 -   Step2_Analysis_of_simulated_data_sets_LPGM.Rmd Analyse simulated data sets via MplusAutomation
 -   Step3_Analysis_of_results_LPGM.Rmd Analyse results from analyses of simulated data sets to examine statistical power
