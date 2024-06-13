@@ -1,0 +1,290 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+library(MplusAutomation)
+library(tidyverse)
+library(magrittr)
+
+save(results, file = "results.Rdata")
+
+length(results)
+for(i in 1:length(results)){
+  results_summaries <- results[[i]]$summaries
+  T11p <- results_summaries$T11_VLMR_PValue
+  BLRTp <- results_summaries$BLRT_PValue
+  results_tab[i, 1:3] <- c(results_summaries$LL,
+                       results_summaries$Observations,
+                       results_summaries$Parameters)
+  if (length(T11p) > 0){results_tab[i, 4] <- T11p}
+  if (length(BLRTp) > 0){results_tab[i, 5] <- BLRTp}
+
+  results_tab$Title[i] <- results_summaries$Title
+}
+
+results_tab %<>% filter(VLMR < 100)
+
+results_tab %<>%
+  mutate(
+    AIC = 2 * Parameters - 2 * LL,
+    BIC = log(Observations) * Parameters - 2 * LL,
+    aBIC = log((Observations + 2) / 24) * Parameters - 2 * LL,
+    AIC3 = 3 * Parameters - 2 * LL,
+    CAIC = log(Observations) * Parameters - 2 * LL + Parameters
+  ) %>%
+  separate_wider_delim(Title, "_", names = c(NA, NA, "Sample", "Attrition", "Dataset", "Profiles"))
+
+dim(results_tab)
+
+table(results_tab$Attrition)
+
+save(results_tab, file = "results_tab.Rdata")
+
+#Number of profiles with minimum AIC, BIC, aBIC for each dataset
+overunderfit <- data.frame(Sample = NA,
+                           Attrition = NA,
+                           Dataset = NA,
+                           min_AIC = NA,
+                           min_BIC = NA,
+                           min_aBIC = NA,
+                           min_AIC3 = NA,
+                           min_CAIC = NA#,
+                           # max_VLMR = NA,
+                           # max_BLRT = NA
+                           )
+run <- 1
+
+# results_tab %>%
+#   group_by(Sample, Attrition, Dataset) %>%
+#   mutate(Sample = Sample,
+#          Attrition = Attrition,
+#          Dataset = Dataset,
+#          max_VLMR = max(Profiles[VLMR < 0.05], na.rm = TRUE))
+
+for(S in unique(results_tab$Sample)){
+  for(A in unique(results_tab$Attrition)){
+      subd <- subset(results_tab, Sample == S & Attrition == A)
+      for (d in unique(subd$Dataset)){
+        
+        #Subset results from specific combination
+        subdat <- subset(subd, Dataset == d)
+        #Indicate sample site, entropy, attrition and number of dataset
+        overunderfit[dim(overunderfit[1]) + 1, ] <- rep(NA, dim(overunderfit)[2])
+        overunderfit$Sample[run] <- S
+        overunderfit$Attrition[run] <- A
+        overunderfit$Dataset[run] <- d
+        #Save number of profiles with lowest AIC into p
+        p <- subdat[which.min(subdat$AIC), ]$Profiles
+        #If number of profiles with lowest AIC exists (so, p has a length > 0), save it into column 5 (min_AIC)
+        if (length(p) > 0){overunderfit$min_AIC[run] <- p}
+        p <- subdat[which.min(subdat$BIC), ]$Profiles
+        if (length(p) > 0){overunderfit$min_BIC[run] <- p}
+        p <- subdat[which.min(subdat$aBIC), ]$Profiles
+        if (length(p) > 0){overunderfit$min_aBIC[run] <- p}
+        p <- subdat[which.min(subdat$AIC3), ]$Profiles
+        if (length(p) > 0){overunderfit$min_AIC3[run] <- p}
+        p <- subdat[which.min(subdat$CAIC), ]$Profiles
+        if (length(p) > 0){overunderfit$min_CAIC[run] <- p}
+        # p <- subdat[which.max(subdat$Profiles[VLMR < .05]), ]$Profiles
+        # if (length(p) > 0){overunderfit$max_VLMR[run] <- p}
+        run <- run + 1
+  #       data <- data %>%
+  # # Find max Profiles where VLMR < 0.05
+  # mutate(max_VLMR = max(Profiles[VLMR < 0.05], na.rm = TRUE)) %>%
+  # # Find max Profiles where BLRT < 0.05
+  # mutate(max_BLRT = max(Profiles[BLRT < 0.05], na.rm = TRUE))
+        
+      }
+    }
+}
+
+which.max(subdat$Profiles[subdat$VLMR < .05])
+
+
+table(overunderfit$Attrition)
+
+overunderfit <- overunderfit[complete.cases(overunderfit),]
+
+save(overunderfit, file = "overunderfit.Rdata")
+
+overunderfit_long <- overunderfit %>%
+  pivot_longer(c("min_AIC", "min_BIC", "min_aBIC", "min_AIC3", "min_CAIC"), names_to = "Index", values_to = "Minimum") %>%
+  mutate(Minimum = str_remove(Minimum, " "))
+
+overunderfit_long %<>%
+  mutate(Correct = if_else(Minimum == "5", 1, 0))
+
+overunderfit_long %<>%
+  mutate(Index = fct_relevel(Index, c("min_AIC", "min_BIC", "min_aBIC", "min_AIC3", "min_CAIC"))) %>%
+  mutate(Index = fct_recode(Index, AIC = "min_AIC", BIC = "min_BIC", aBIC = "min_aBIC", AIC3 = "min_AIC3", CAIC = "min_CAIC"),
+         Sample = fct_relevel(Sample, c("100", "250", "500", "750", "1000")),
+         Attrition = fct_relevel(Attrition, c("noattrition", "attrition05", "attrition10", "attrition15")))
+
+save(overunderfit_long, file = "overunderfit_long.Rdata")
+
+labels.index <- c(min_AIC = "AIC",
+                  min_BIC = "BIC",
+                  min_aBIC = "aBIC",
+                  min_AIC3 = "AIC3",
+                  min_CAIC = "CAIC")
+
+# Figures: Preprations
+
+labels_attrition <- c(noattrition = "no attrition",
+                      attrition05 = "5% attrition",
+                      attrition10 = "10% attrition",
+                      attrition15 = "15% attrition")
+
+labels_sample <- c("100" = "N = 100",
+                   "250" = "N = 250",
+                   "500" = "N = 500",
+                   "750" = "N = 750",
+                   "1000" = "N = 1000")
+
+
+# Figure: Accuracy
+
+overunderfit_long <- rbind(overunderfit_long,
+      overunderfit2_long)
+
+plot_fitpower <- overunderfit_long %>%
+  group_by(Sample, Attrition, Dataset, Index) %>%
+  mutate(Correct = mean(Correct)) %>%
+  ggplot(aes(x = Index, y = Correct*100, group = Index)) +
+  stat_summary(mapping = aes(group = Index, fill = Index), fun = mean, geom = "bar", color = "black", size = 1) +
+  facet_grid(Attrition ~ Sample, labeller = labeller(Attrition = labels_attrition,
+                                                     Sample = labels_sample)) +
+  scale_fill_manual(values = c("grey0", "grey25", "grey50", "grey75", "grey100")) +
+  ylab("% correctly identified model (5 profiles)") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(fill = "Fit index") +
+  theme_bw()
+plot_fitpower
+ggsave("fitpower_2024-13.png", width = 10.5, height = 8, dpi = 450)
+
+#Unter hoher Attrition:
+#Strenge Fit-Indizes (BIC, CAIC) schlechter, mittelstrenge (AIC3, aBIC) besser, AIC schlechter
+#AIC überschätzt höher (flutscht über seinen "Sweet Spot" hinaus)
+#BIC unterschätzt höher (erreicht seinen Sweet Spot nicht so gut wie eigentlich bei N = 1000 schon);
+#die Stichprobengrösse wird also durch die fehlenden Daten einfach "geringer" (was Sinn macht unter FIML)
+
+#+ Alle Fit-Indizes funktionieren bei N = 750 gut!
+#+ AIC, aBIC, AIC3 überschätzen moderat bei N = 750, BIC und CAIC unterschätzen moderat
+
+# Individual fit indices
+plot_AIC <- ggplot(subset(overunderfit_long, Index == "AIC"), aes(x = Minimum, fill = Minimum, group = interaction(Attrition, Sample))) +
+  geom_bar(aes(y = ..prop..,
+               fill = factor(..x..)),
+           stat = "count",
+           colour = "black",
+           na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent) +
+  facet_grid(Attrition ~ Sample, labeller = labeller( Attrition = labels_attrition,
+                                                               Sample = labels_sample)) +
+ # scale_x_continuous(breaks = c(3, 4, 5)) +
+  ylab("Proportion lowest fit index estimate") +
+  labs(fill = "Number\nof Profiles") +
+  xlab("Number of profiles") +
+  scale_fill_manual(values = c("grey50", "white", "black")) +
+  theme(legend.position = "none") +
+  theme_bw() +
+  ggtitle("AIC")
+plot_AIC
+ggsave("2024_06_13_grid_col_AIC.png", width = 10, height = 8, dpi = 450)
+
+plot_BIC <- ggplot(subset(overunderfit_long, Index == "BIC"), aes(x = Minimum, fill = Minimum, group = interaction(Attrition, Sample))) +
+  geom_bar(aes(y = ..prop..,
+               fill = factor(..x..)),
+           stat = "count",
+           colour = "black",
+           na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent) +
+  facet_grid(Attrition ~ Sample, labeller = labeller( Attrition = labels_attrition,
+                                                               Sample = labels_sample)) +
+ # scale_x_continuous(breaks = c(3, 4, 5)) +
+  ylab("Proportion lowest fit index estimate") +
+  labs(fill = "Number\nof Profiles") +
+  xlab("Number of profiles") +
+  scale_fill_manual(values = c("grey50", "white", "black")) +
+  theme(legend.position = "none") +
+  theme_bw() +
+  ggtitle("BIC")
+plot_BIC
+ggsave("2024_06_13_grid_col_BIC.png", width = 10, height = 8, dpi = 450)
+
+
+plot_aBIC <- ggplot(subset(overunderfit_long, Index == "aBIC"), aes(x = Minimum, fill = Minimum, group = interaction(Attrition, Sample))) +
+  geom_bar(aes(y = ..prop..,
+               fill = factor(..x..)),
+           stat = "count",
+           colour = "black",
+           na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent) +
+  facet_grid(Attrition ~ Sample, labeller = labeller( Attrition = labels_attrition,
+                                                               Sample = labels_sample)) +
+ # scale_x_continuous(breaks = c(3, 4, 5)) +
+  ylab("Proportion lowest fit index estimate") +
+  labs(fill = "Number\nof Profiles") +
+  xlab("Number of profiles") +
+  scale_fill_manual(values = c("grey50", "white", "black")) +
+  theme(legend.position = "none") +
+  theme_bw() +
+  ggtitle("aBIC")
+plot_aBIC
+ggsave("2024_06_13_grid_col_aBIC.png", width = 10, height = 8, dpi = 450)
+
+plot_AIC3 <- ggplot(subset(overunderfit_long, Index == "AIC3"), aes(x = Minimum, fill = Minimum, group = interaction(Attrition, Sample))) +
+  geom_bar(aes(y = ..prop..,
+               fill = factor(..x..)),
+           stat = "count",
+           colour = "black",
+           na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent) +
+  facet_grid(Attrition ~ Sample, labeller = labeller( Attrition = labels_attrition,
+                                                               Sample = labels_sample)) +
+ # scale_x_continuous(breaks = c(3, 4, 5)) +
+  ylab("Proportion lowest fit index estimate") +
+  labs(fill = "Number\nof Profiles") +
+  xlab("Number of profiles") +
+  scale_fill_manual(values = c("grey50", "white", "black")) +
+  theme(legend.position = "none") +
+  theme_bw() +
+  ggtitle("AIC3")
+plot_AIC3
+ggsave("2024_06_13_grid_col_AIC3.png", width = 10, height = 8, dpi = 450)
+
+plot_CAIC <- ggplot(subset(overunderfit_long, Index == "CAIC"), aes(x = Minimum, fill = Minimum, group = interaction(Attrition, Sample))) +
+  geom_bar(aes(y = ..prop..,
+               fill = factor(..x..)),
+           stat = "count",
+           colour = "black",
+           na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent) +
+  facet_grid(Attrition ~ Sample, labeller = labeller( Attrition = labels_attrition,
+                                                               Sample = labels_sample)) +
+ # scale_x_continuous(breaks = c(3, 4, 5)) +
+  ylab("Proportion lowest fit index estimate") +
+  labs(fill = "Number\nof Profiles") +
+  xlab("Number of profiles") +
+  scale_fill_manual(values = c("grey50", "white", "black")) +
+  theme(legend.position = "none") +
+  theme_bw() +
+  ggtitle("CAIC")
+plot_CAIC
+ggsave("2024_06_13_grid_col_CAIC.png", width = 10, height = 8, dpi = 450)
+# Number of analyzed datasets per condition
+
+ggpubr::ggarrange(plot_fitpower, plot_AIC, plot_BIC, plot_aBIC, plot_AIC3, plot_CAIC)
+
+ggsave("plots_fit.png", width = 16, height = 8, dpi = 450)
+
+
+```
+
