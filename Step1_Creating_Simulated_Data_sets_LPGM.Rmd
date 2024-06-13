@@ -1,0 +1,590 @@
+---
+title: "Project PRSIMA: Latent Profile Analysis Monte Carlo"
+output: 
+  html_document: 
+    df_print: default
+    highlight: espresso
+    keep_md: yes
+    smart: no
+    theme: spacelab
+encoding: UTF-8
+editor_options: 
+  chunk_output_type: console
+author: ""
+---
+
+##Notes
+
+Monte Carlo Simulation Study:
+Latent Profile Analysis with eight Gaussian indicator variables,
+
+##Preparations: R package loadings
+
+```{r}
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+library(MplusAutomation)
+library(tidyverse)
+dir.create("C:/local user data/LPGM_simus/")
+setwd("C:/local user data/LPGM_simus/")
+
+```
+
+
+##Data Simulation
+
+###Set up Mplus model simulations for MplusAutomation
+
+```{r mplus.model}
+
+#Define Mplus model of simulated LPA
+
+LPGMmodels_het <- '
+
+[[init]]
+
+iterators = n;
+n = 100 250 500 750 1000;
+
+filename = "LPGM_simus_[[n]].inp";
+outputDirectory = "./LPGM_simus_inputs/n_[[n]]/";
+
+[[/init]]
+
+TITLE:
+[[n]]
+
+MONTECARLO:
+
+!Create indicator variables
+NAMES = 
+y1-y8
+m1-m3
+CLASS
+;
+
+!n; sample size
+NOBSERVATIONS = [[n]];
+NREPS = 1;
+SEED = 666;
+GenClasses = p(5);
+Classes =    p(5);
+
+
+PATMISS = y1(.05) y2(.05) y3(.05) y4(.05)
+          y5(.05) y6(.05) y7(.05) y8(.05)
+          m1(.10) m2(.10) m3(.10);
+PATPROBS = 1;
+
+
+!Save simulated datasets
+REPSAVE = ALL; 
+SAVE = LPGM_sim_[[n]]_*.dat;
+
+ANALYSIS:
+  
+TYPE = mixture;
+MITER = 1000;
+MCONV = 0.01;
+
+MODEL POPULATION:
+
+%overall%
+
+[p#1*0];
+[p#2*1];
+[p#3*0];
+[p#4*0];
+
+MI BY M1@1 M2@1 M3@1;
+MS BY M1@0 M2@1 M3@2;
+
+[MI*-1];
+MI@3;
+
+[MS*0];
+MI@0.5;
+
+[CLASS*0];
+CLASS*1;
+
+MI WITH CLASS*.15 (mi1);
+
+MS ON CLASS*.20 (ms1);
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#1%
+
+[y1*-1] (11);
+[y2*-1] (21);
+[y3*-1] (31);
+[y4*-1] (41);
+[y5*-1] (51);
+[y6*-1] (61);
+[y7*-1] (71);
+[y8*-1] (81);
+
+y1*0.30 (a1);
+y2*0.30 (b1);
+y3*0.30 (c1);
+y4*0.30 (d1);
+y5*0.30 (e1);
+y6*0.30 (f1);
+y7*0.30 (g1);
+y8*0.30 (h1);
+
+[CLASS*0];
+CLASS*1;
+
+MI WITH CLASS*.15 (mi1);
+
+MS ON CLASS*.20 (ms1);
+
+[MI*-1];
+MI@3;
+
+[MS*0];
+MI@0.5;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#2%
+
+[y1*0] (12);
+[y2*0] (22);
+[y3*0] (32);
+[y4*0] (42);
+[y5*0] (52);
+[y6*0] (62);
+[y7*0] (72);
+[y8*0] (82);
+
+y1*0.80 (a2);
+y2*0.80 (b2);
+y3*0.80 (c2);
+y4*0.80 (d2);
+y5*0.80 (e2);
+y6*0.80 (f2);
+y7*0.80 (g2);
+y8*0.80 (h2);
+
+MI WITH CLASS*.15 (mi2);
+
+MS ON CLASS*.05 (ms2);
+
+[MI*0];
+MI@5;
+
+[MS*1];
+MI@1;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#3%
+
+[y1*1] (13);
+[y2*1] (23);
+[y3*1] (33);
+[y4*1] (43);
+[y5*1] (53);
+[y6*1] (63);
+[y7*1] (73);
+[y8*1] (83);
+
+y1*0.30 (a3);
+y2*0.30 (b3);
+y3*0.30 (c3);
+y4*0.30 (d3);
+y5*0.30 (e3);
+y6*0.30 (f3);
+y7*0.30 (g3);
+y8*0.30 (h3);
+
+MI WITH CLASS*.15 (mi3);
+
+MS ON CLASS*-.10 (ms3);
+
+[MI*1];
+MI@3;
+
+[MS*2];
+MI@0.5;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#4%
+
+[y1*-0.75] (14);
+[y2*-0.75] (24);
+[y3*0.75] (34);
+[y4*0.75] (44);
+[y5*0.75] (54);
+[y6*0.75] (64);
+[y7*0.75] (74);
+[y8*-0.75] (84);
+
+y1*0.45 (a4);
+y2*0.45 (b4);
+y3*0.45 (c4);
+y4*0.45 (d4);
+y5*0.45 (e4);
+y6*0.45 (f4);
+y7*0.45 (g4);
+y8*0.45 (h4);
+
+MI WITH CLASS*.15 (mi4);
+
+MS ON CLASS*.00 (ms4);
+
+[MI*0];
+MI@5;
+
+[MS*0];
+MI@1;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#5%
+
+[y1*0.75] (15);
+[y2*0.75] (25);
+[y3*-0.75] (35);
+[y4*-0.75] (45);
+[y5*-0.75] (55);
+[y6*-0.75] (65);
+[y7*-0.75] (75);
+[y8*0.75] (85);
+
+y1*0.45 (a5);
+y2*0.45 (b5);
+y3*0.45 (c5);
+y4*0.45 (d5);
+y5*0.45 (e5);
+y6*0.45 (f5);
+y7*0.45 (g5);
+y8*0.45 (h5);
+
+MI WITH CLASS*.15 (mi5);
+
+MS ON CLASS*.20 (ms5);
+
+[MI*0];
+MI@5;
+
+[MS*0];
+MI@1;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+MODEL:
+
+%overall%
+
+[p#1*0];
+[p#2*1];
+[p#3*0];
+[p#4*0];
+
+MI BY M1@1 M2@1 M3@1;
+MS BY M1@0 M2@1 M3@2;
+
+[MI*-1];
+MI@3;
+
+[MS*0];
+MI@0.5;
+
+[CLASS*0];
+CLASS*1;
+
+MI WITH CLASS*.15 (mi1);
+
+MS ON CLASS*.20 (ms1);
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#1%
+
+[y1*-1] (11);
+[y2*-1] (21);
+[y3*-1] (31);
+[y4*-1] (41);
+[y5*-1] (51);
+[y6*-1] (61);
+[y7*-1] (71);
+[y8*-1] (81);
+
+y1*0.30 (a1);
+y2*0.30 (b1);
+y3*0.30 (c1);
+y4*0.30 (d1);
+y5*0.30 (e1);
+y6*0.30 (f1);
+y7*0.30 (g1);
+y8*0.30 (h1);
+
+MI WITH CLASS*.15 (mi1);
+
+MS ON CLASS*.20 (ms1);
+
+[MI*-1];
+MI@3;
+
+[MS*0];
+MI@0.5;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#2%
+
+[y1*0] (12);
+[y2*0] (22);
+[y3*0] (32);
+[y4*0] (42);
+[y5*0] (52);
+[y6*0] (62);
+[y7*0] (72);
+[y8*0] (82);
+
+y1*0.80 (a2);
+y2*0.80 (b2);
+y3*0.80 (c2);
+y4*0.80 (d2);
+y5*0.80 (e2);
+y6*0.80 (f2);
+y7*0.80 (g2);
+y8*0.80 (h2);
+
+MI WITH CLASS*.15 (mi2);
+
+MS ON CLASS*.05 (ms2);
+
+[MI*0];
+MI@5;
+
+[MS*1];
+MI@1;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#3%
+
+[y1*1] (13);
+[y2*1] (23);
+[y3*1] (33);
+[y4*1] (43);
+[y5*1] (53);
+[y6*1] (63);
+[y7*1] (73);
+[y8*1] (83);
+
+y1*0.30 (a3);
+y2*0.30 (b3);
+y3*0.30 (c3);
+y4*0.30 (d3);
+y5*0.30 (e3);
+y6*0.30 (f3);
+y7*0.30 (g3);
+y8*0.30 (h3);
+
+MI WITH CLASS*.15 (mi3);
+
+MS ON CLASS*-.10 (ms3);
+
+[MI*1];
+MI@3;
+
+[MS*2];
+MI@0.5;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#4%
+
+[y1*-0.75] (14);
+[y2*-0.75] (24);
+[y3*0.75] (34);
+[y4*0.75] (44);
+[y5*0.75] (54);
+[y6*0.75] (64);
+[y7*0.75] (74);
+[y8*-0.75] (84);
+
+y1*0.45 (a4);
+y2*0.45 (b4);
+y3*0.45 (c4);
+y4*0.45 (d4);
+y5*0.45 (e4);
+y6*0.45 (f4);
+y7*0.45 (g4);
+y8*0.45 (h4);
+
+MI WITH CLASS*.15 (mi4);
+
+MS ON CLASS*.00 (ms4);
+
+[MI*0];
+MI@5;
+
+[MS*0];
+MI@1;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+%p#5%
+
+[y1*0.75] (15);
+[y2*0.75] (25);
+[y3*-0.75] (35);
+[y4*-0.75] (45);
+[y5*-0.75] (55);
+[y6*-0.75] (65);
+[y7*-0.75] (75);
+[y8*0.75] (85);
+
+y1*0.45 (a5);
+y2*0.45 (b5);
+y3*0.45 (c5);
+y4*0.45 (d5);
+y5*0.45 (e5);
+y6*0.45 (f5);
+y7*0.45 (g5);
+y8*0.45 (h5);
+
+MI WITH CLASS*.15 (mi5);
+
+MS ON CLASS*.20 (ms5);
+
+[MI*0];
+MI@5;
+
+[MS*0];
+MI@1;
+
+[CLASS*0];
+CLASS*1;
+
+[M1@0];
+[M2@0];
+[M3@0];
+
+M1*0.2;
+M2*0.2;
+M3*0.2;
+
+MODEL CONSTRAINT:
+NEW (DIFF13 DIFF45);
+DIFF13 = ms3 - ms1;
+DIFF45 = ms5 - ms4;
+
+OUTPUT: TECH9;
+
+'
+
+```
+
+ 
+###Run data simulations
+
+```{r data.simulations}
+
+#Write template into textfile
+write(LPGMmodels_het, file = "LPGMmodels_het.txt")
+
+#Write Mplus input files based on template for all 30 combinations of N, E, missingdata(attrition).
+createModels("LPGMmodels_het.txt")
+
+#Run Mplus input files
+setwd("./LPGM_simus_inputs/")
+runModels(recursive = TRUE)
+
+```
