@@ -1,4 +1,4 @@
-# Latent Profile Analysis to Identify School Readiness Profiles and their Effects on Development During Schooling
+# Identifying School Readiness Profiles and their Effects on Development During Schooling: A Systematic/Scoping Review and Simulation Study
 
 Simulation Study:
 Vary factors:
