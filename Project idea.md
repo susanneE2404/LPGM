@@ -1,4 +1,4 @@
-# Identifying School Readiness Profiles and their Effects on Development During Schooling: A Systematic/Scoping Review and Simulation Study
+# Identifying School Readiness Profiles and their Effects on Development During Schooling: A Scoping Methodological Review and Simulation Study
 
 Simulation Study:
 Vary factors:
