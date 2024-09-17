@@ -1,0 +1,573 @@
+---
+title: "Project PRSIMA: Latent Profile Analysis Monte Carlo"
+output: 
+  html_document: 
+    df_print: default
+    highlight: espresso
+    keep_md: yes
+    smart: no
+    theme: spacelab
+encoding: UTF-8
+editor_options: 
+  chunk_output_type: console
+author: ""
+---
+
+##Notes
+
+Monte Carlo Simulation Study:
+Latent Profile Analysis with eight Gaussian indicator variables,
+
+##Preparations: R package loadings
+
+```{r}
+
+setwd("D:/12 R projects/PRISMA")
+
+library(MplusAutomation)
+library(tidyverse)
+dir.create("D:/12 R projects/PRISMA/LPGMLM_simus/")
+setwd("D:/12 R projects/PRISMA/LPGMLM_simus/")
+
+```
+
+
+##Data Simulation
+
+###Set up Mplus model simulations for MplusAutomation
+
+```{r mplus.model}
+
+#Define Mplus model of simulated LPA
+
+MMLPA_51samples_models_het <- '
+
+[[init]]
+
+iterators = n;
+n = 250 260 270 280 290 300 310 320 330 340 350 360 370 380 390 400 410 420 430 440 450 460 470 480 490 500 510 520 530 540 550 560 570 580 590 600 610 620 630 640 650 660 670 680 690 700 710 720 730 740 750;
+
+filename = "MMLPA_simus_[[n]].inp";
+outputDirectory = "./MMLPA_simus_inputs/n_[[n]]/";
+
+[[/init]]
+
+TITLE:
+[[n]]
+
+MONTECARLO:
+
+!Create indicator variables
+NAMES = 
+y1-y8
+;
+
+!n; sample size
+NOBSERVATIONS = [[n]];
+ncsizes = 3;
+
+[[n = 250]] 
+CSIZES = 5(5) 12(10) 7(15); 
+[[/n = 250]]
+
+[[n = 260]] 
+CSIZES = 6(5) 11(10) 8(15); 
+[[/n = 260]]
+
+[[n = 270]] 
+CSIZES = 7(5) 10(10) 9(15); 
+[[/n = 270]]
+
+[[n = 280]] 
+CSIZES = 7(5) 11(10) 9(15); 
+[[/n = 280]]
+
+[[n = 290]] 
+CSIZES = 9(5) 11(10) 9(15); 
+[[/n = 290]]
+
+[[n = 300]] 
+CSIZES = 9(5) 12(10) 9(15); 
+[[/n = 300]]
+
+[[n = 310]] 
+CSIZES = 8(5) 12(10) 10(15); 
+[[/n = 310]]
+
+[[n = 320]] 
+CSIZES = 10(5) 12(10) 10(15); 
+[[/n = 320]]
+
+[[n = 330]] 
+CSIZES = 11(5) 11(10) 11(15); 
+[[/n = 330]]
+
+[[n = 340]] 
+CSIZES = 14(5) 12(10) 10(15); 
+[[/n = 340]]
+
+[[n = 350]] 
+CSIZES = 12(5) 11(10) 12(15); 
+[[/n = 350]]
+
+[[n = 360]] 
+CSIZES = 12(5) 12(10) 12(15); 
+[[/n = 360]]
+
+[[n = 370]] 
+CSIZES = 10(5) 14(10) 12(15); 
+[[/n = 370]]
+
+[[n = 380]] 
+CSIZES = 13(5) 12(10) 13(15); 
+[[/n = 380]]
+
+[[n = 390]] 
+CSIZES = 13(5) 13(10) 13(15); 
+[[/n = 390]]
+
+[[n = 400]] 
+CSIZES = 13(5) 14(10) 13(15); 
+[[/n = 400]]
+
+[[n = 410]] 
+CSIZES = 12(5) 14(10) 14(15); 
+[[/n = 410]]
+
+[[n = 420]] 
+CSIZES = 12(5) 15(10) 14(15); 
+[[/n = 420]]
+
+[[n = 430]] 
+CSIZES = 14(5) 15(10) 14(15); 
+[[/n = 430]]
+
+[[n = 440]] 
+CSIZES = 16(5) 15(10) 14(15); 
+[[/n = 440]]
+
+[[n = 450]] 
+CSIZES = 15(5) 15(10) 15(15); 
+[[/n = 450]]
+
+[[n = 460]] 
+CSIZES = 15(5) 16(10) 15(15); 
+[[/n = 460]]
+
+[[n = 470]] 
+CSIZES = 17(5) 16(10) 15(15); 
+[[/n = 470]]
+
+[[n = 480]] 
+CSIZES = 17(5) 17(10) 15(15); 
+[[/n = 480]]
+
+[[n = 490]] 
+CSIZES = 16(5) 17(10) 16(15); 
+[[/n = 490]]
+
+[[n = 500]] 
+CSIZES = 16(5) 18(10) 16(15); 
+[[/n = 500]]
+
+[[n = 510]] 
+CSIZES = 16(5) 19(10) 16(15); 
+[[/n = 510]]
+
+[[n = 520]] 
+CSIZES = 18(5) 19(10) 16(15); 
+[[/n = 520]]
+
+[[n = 530]] 
+CSIZES = 18(5) 20(10) 16(15); 
+[[/n = 530]]
+
+[[n = 540]] 
+CSIZES = 17(5) 20(10) 17(15); 
+[[/n = 540]]
+
+[[n = 550]] 
+CSIZES = 19(5) 20(10) 17(15); 
+[[/n = 550]]
+
+[[n = 560]] 
+CSIZES = 19(5) 21(10) 17(15); 
+[[/n = 560]]
+
+[[n = 570]] 
+CSIZES = 20(5) 20(10) 18(15); 
+[[/n = 570]]
+
+[[n = 580]] 
+CSIZES = 19(5) 20(10) 19(15); 
+[[/n = 580]]
+
+[[n = 590]] 
+CSIZES = 21(5) 20(10) 19(15); 
+[[/n = 590]]
+
+[[n = 600]] 
+CSIZES = 20(5) 20(10) 20(15); 
+[[/n = 600]]
+
+[[n = 610]] 
+CSIZES = 19(5) 20(10) 21(15); 
+[[/n = 610]]
+
+[[n = 620]] 
+CSIZES = 18(5) 20(10) 22(15); 
+[[/n = 620]]
+
+[[n = 630]] 
+CSIZES = 17(5) 20(10) 23(15); 
+[[/n = 630]]
+
+[[n = 640]] 
+CSIZES = 19(5) 20(10) 23(15); 
+[[/n = 640]]
+
+[[n = 650]] 
+CSIZES = 19(5) 21(10) 23(15); 
+[[/n = 650]]
+
+[[n = 660]] 
+CSIZES = 21(5) 21(10) 23(15); 
+[[/n = 660]]
+
+[[n = 670]] 
+CSIZES = 20(5) 21(10) 24(15); 
+[[/n = 670]]
+
+[[n = 680]] 
+CSIZES = 20(5) 22(10) 24(15); 
+[[/n = 680]]
+
+[[n = 690]] 
+CSIZES = 20(5) 23(10) 24(15); 
+[[/n = 690]]
+
+[[n = 700]] 
+CSIZES = 22(5) 23(10) 24(15); 
+[[/n = 700]]
+
+[[n = 710]] 
+CSIZES = 21(5) 23(10) 25(15); 
+[[/n = 710]]
+
+[[n = 720]] 
+CSIZES = 21(5) 24(10) 25(15); 
+[[/n = 720]]
+
+[[n = 730]] 
+CSIZES = 22(5) 26(10) 24(15); 
+[[/n = 730]]
+
+[[n = 740]] 
+CSIZES = 22(5) 27(10) 24(15); 
+[[/n = 740]]
+
+[[n = 750]] 
+CSIZES = 24(5) 27(10) 24(15); 
+[[/n = 750]]
+
+
+NREPS = 10;
+SEED = 666;
+GenClasses = pb(2) p(5);
+Classes = pb(2) p(5);
+
+WITHIN = y1-y8; 
+BETWEEN = pb; 
+
+
+PATMISS = y1(.05) y2(.05) y3(.05) y4(.05)
+          y5(.05) y6(.05) y7(.05) y8(.05);
+PATPROBS = 1;
+
+
+!Save simulated datasets
+REPSAVE = ALL; 
+SAVE = MMLPA_sim_[[n]]_*.dat;
+
+ANALYSIS:
+  
+TYPE = twolevel mixture;
+MITER = 1000;
+MCONV = 0.01;
+
+MODEL POPULATION:
+
+%within%
+%overall%
+
+[p#1*0];
+[p#2*1];
+[p#3*0];
+[p#4*0];
+
+%Between%
+%Overall%
+
+!Profile sizes for classroom profiles
+[pb#1*0]; 
+
+! Dependence of student profile probabilities 
+! on classroom profile
+p#1 on pb*1;
+p#2 on pb*1;
+p#3 on pb*-1;
+p#4 on pb*-1;
+
+MODEL POPULATION-p:
+
+%within%
+
+%p#1%
+
+[y1*-1] (11);
+[y2*-1] (21);
+[y3*-1] (31);
+[y4*-1] (41);
+[y5*-1] (51);
+[y6*-1] (61);
+[y7*-1] (71);
+[y8*-1] (81);
+
+y1*0.30 (a1);
+y2*0.30 (b1);
+y3*0.30 (c1);
+y4*0.30 (d1);
+y5*0.30 (e1);
+y6*0.30 (f1);
+y7*0.30 (g1);
+y8*0.30 (h1);
+
+%p#2%
+
+[y1*0] (12);
+[y2*0] (22);
+[y3*0] (32);
+[y4*0] (42);
+[y5*0] (52);
+[y6*0] (62);
+[y7*0] (72);
+[y8*0] (82);
+
+y1*0.80 (a2);
+y2*0.80 (b2);
+y3*0.80 (c2);
+y4*0.80 (d2);
+y5*0.80 (e2);
+y6*0.80 (f2);
+y7*0.80 (g2);
+y8*0.80 (h2);
+
+%p#3%
+
+[y1*1] (13);
+[y2*1] (23);
+[y3*1] (33);
+[y4*1] (43);
+[y5*1] (53);
+[y6*1] (63);
+[y7*1] (73);
+[y8*1] (83);
+
+y1*0.30 (a3);
+y2*0.30 (b3);
+y3*0.30 (c3);
+y4*0.30 (d3);
+y5*0.30 (e3);
+y6*0.30 (f3);
+y7*0.30 (g3);
+y8*0.30 (h3);
+
+%p#4%
+
+[y1*-0.75] (14);
+[y2*-0.75] (24);
+[y3*0.75] (34);
+[y4*0.75] (44);
+[y5*0.75] (54);
+[y6*0.75] (64);
+[y7*0.75] (74);
+[y8*-0.75] (84);
+
+y1*0.45 (a4);
+y2*0.45 (b4);
+y3*0.45 (c4);
+y4*0.45 (d4);
+y5*0.45 (e4);
+y6*0.45 (f4);
+y7*0.45 (g4);
+y8*0.45 (h4);
+
+%p#5%
+
+[y1*0.75] (15);
+[y2*0.75] (25);
+[y3*-0.75] (35);
+[y4*-0.75] (45);
+[y5*-0.75] (55);
+[y6*-0.75] (65);
+[y7*-0.75] (75);
+[y8*0.75] (85);
+
+y1*0.45 (a5);
+y2*0.45 (b5);
+y3*0.45 (c5);
+y4*0.45 (d5);
+y5*0.45 (e5);
+y6*0.45 (f5);
+y7*0.45 (g5);
+y8*0.45 (h5);
+
+
+MODEL:
+
+%within%
+%overall%
+
+[p#1*0];
+[p#2*1];
+[p#3*0];
+[p#4*0];
+
+%Between%
+%Overall%
+!Profile sizes for classroom profiles
+[pb#1*0]; 
+
+
+p#1 on pb*1;
+p#2 on pb*1;
+p#3 on pb*-1;
+p#4 on pb*-1;
+
+MODEL p:
+
+%within%
+
+%p#1%
+
+[y1*-1] (11);
+[y2*-1] (21);
+[y3*-1] (31);
+[y4*-1] (41);
+[y5*-1] (51);
+[y6*-1] (61);
+[y7*-1] (71);
+[y8*-1] (81);
+
+y1*0.30 (a1);
+y2*0.30 (b1);
+y3*0.30 (c1);
+y4*0.30 (d1);
+y5*0.30 (e1);
+y6*0.30 (f1);
+y7*0.30 (g1);
+y8*0.30 (h1);
+
+%p#2%
+
+[y1*0] (12);
+[y2*0] (22);
+[y3*0] (32);
+[y4*0] (42);
+[y5*0] (52);
+[y6*0] (62);
+[y7*0] (72);
+[y8*0] (82);
+
+y1*0.80 (a2);
+y2*0.80 (b2);
+y3*0.80 (c2);
+y4*0.80 (d2);
+y5*0.80 (e2);
+y6*0.80 (f2);
+y7*0.80 (g2);
+y8*0.80 (h2);
+
+%p#3%
+
+[y1*1] (13);
+[y2*1] (23);
+[y3*1] (33);
+[y4*1] (43);
+[y5*1] (53);
+[y6*1] (63);
+[y7*1] (73);
+[y8*1] (83);
+
+y1*0.30 (a3);
+y2*0.30 (b3);
+y3*0.30 (c3);
+y4*0.30 (d3);
+y5*0.30 (e3);
+y6*0.30 (f3);
+y7*0.30 (g3);
+y8*0.30 (h3);
+
+%p#4%
+
+[y1*-0.75] (14);
+[y2*-0.75] (24);
+[y3*0.75] (34);
+[y4*0.75] (44);
+[y5*0.75] (54);
+[y6*0.75] (64);
+[y7*0.75] (74);
+[y8*-0.75] (84);
+
+y1*0.45 (a4);
+y2*0.45 (b4);
+y3*0.45 (c4);
+y4*0.45 (d4);
+y5*0.45 (e4);
+y6*0.45 (f4);
+y7*0.45 (g4);
+y8*0.45 (h4);
+
+%p#5%
+
+[y1*0.75] (15);
+[y2*0.75] (25);
+[y3*-0.75] (35);
+[y4*-0.75] (45);
+[y5*-0.75] (55);
+[y6*-0.75] (65);
+[y7*-0.75] (75);
+[y8*0.75] (85);
+
+y1*0.45 (a5);
+y2*0.45 (b5);
+y3*0.45 (c5);
+y4*0.45 (d5);
+y5*0.45 (e5);
+y6*0.45 (f5);
+y7*0.45 (g5);
+y8*0.45 (h5);
+
+
+OUTPUT: TECH9 TECH14;
+
+'
+
+```
+
+ 
+###Run data simulations
+
+```{r data.simulations}
+
+#Write template into textfile
+write(MMLPA_51samples_models_het, file = "MMLPAmodels_het.txt")
+
+#Write Mplus input files based on template for all 30 combinations of N, E, missingdata(attrition).
+createModels("MMLPAmodels_het.txt")
+
+#Run Mplus input files
+setwd("./MMLPA_simus_inputs/")
+runModels(recursive = TRUE)
+
+```
