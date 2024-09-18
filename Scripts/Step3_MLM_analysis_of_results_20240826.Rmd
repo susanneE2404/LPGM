@@ -1,0 +1,314 @@
+---
+title: "Step3_testdurchlauf"
+author: "Susanne Enke"
+date: "2024-09-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(MplusAutomation)
+library(tidyverse)
+library(ggpubr)
+library(ggplot2)
+library(magrittr)
+library(dplyr)
+library(tidyr)
+
+load(".RData")
+
+# Arbeitsverzeichnis festlegen und Daten laden
+#setwd("D:/12 R projects/PRISMA/LPGMLM_simus/LPGMLM_analysis_inputs/")
+
+#results <- readModels("D:/12 R #projects/PRISMA/LPGMLM_simus/LPGMLM_analysis_inputs/")  
+
+
+results_tab <- data.frame(LL = numeric(length(results)),
+                          Observations = numeric(length(results)),
+                          Parameters = numeric(length(results)),
+                          VLMR = numeric(length(results)),
+                          BLRT = numeric(length(results)),
+                          Title = numeric(length(results)))
+
+for(i in 1:length(results)) {
+  results_summaries <- results[[i]]$summaries
+  # Extract the values and set NA if a value is missing
+  # `ifelse` checks if a value is NULL. If it is, NA is used instead of NULL.
+  # This prevents inserting fewer than 5 values into the table.
+  LL <- ifelse(!is.null(results_summaries$LL), results_summaries$LL, NA)
+  Observations <- ifelse(!is.null(results_summaries$Observations), results_summaries$Observations, NA)
+  Parameters <- ifelse(!is.null(results_summaries$Parameters), results_summaries$Parameters, NA)
+  T11_VLMR_PValue <- ifelse(!is.null(results_summaries$T11_VLMR_PValue), results_summaries$T11_VLMR_PValue, NA)
+  BLRT_PValue <- ifelse(!is.null(results_summaries$BLRT_PValue), results_summaries$BLRT_PValue, NA)
+  
+  # Insert the values into the row of the DataFrame
+  results_tab[i, 1:5] <- c(LL, Observations, Parameters, T11_VLMR_PValue, BLRT_PValue)
+  
+  # Set the title if available
+  results_tab$Title[i] <- ifelse(!is.null(results_summaries$Title), results_summaries$Title, NA)
+}
+
+results_tab %<>%
+  mutate(
+    AIC = 2 * Parameters - 2 * LL,
+    BIC = log(Observations) * Parameters - 2 * LL,
+    aBIC = log((Observations + 2) / 24) * Parameters - 2 * LL,
+    AIC3 = 3 * Parameters - 2 * LL,
+    CAIC = log(Observations) * Parameters - 2 * LL + Parameters
+  ) %>%
+  separate_wider_delim(Title, "_", names = c(NA, NA, "Sample", "Dataset", "Profiles"))
+
+#Number of profiles with minimum AIC, BIC, aBIC for each dataset
+overunderfit <- data.frame(Sample = NA,
+                           #Attrition = NA,
+                           Dataset = NA,
+                           min_AIC = NA,
+                           min_BIC = NA,
+                           min_aBIC = NA,
+                           min_AIC3 = NA,
+                           min_CAIC = NA)
+run <- 1
+
+for(S in unique(results_tab$Sample)){
+  #for(A in unique(results_tab$Attrition)){
+      subd <- subset(results_tab, Sample == S) # & Attrition == A)
+      for (d in unique(subd$Dataset)){
+                #Subset results from specific combination
+        subdat <- subset(subd, Dataset == d)
+        #Indicate sample site, entropy, attrition and number of dataset
+        overunderfit[dim(overunderfit[1]) + 1, ] <- rep(NA, dim(overunderfit)[2])
+        overunderfit$Sample[run] <- S
+        #overunderfit$Attrition[run] <- A
+        overunderfit$Dataset[run] <- d
+        #Save number of profiles with lowest AIC into p
+        p <- subdat[which.min(subdat$AIC), ]$Profiles
+        #If number of profiles with lowest AIC exists (so, p has a length > 0), save it into column 5 (min_AIC)
+        if (length(p) > 0){overunderfit$min_AIC[run] <- p}
+        p <- subdat[which.min(subdat$BIC), ]$Profiles
+        if (length(p) > 0){overunderfit$min_BIC[run] <- p}
+        p <- subdat[which.min(subdat$aBIC), ]$Profiles
+        if (length(p) > 0){overunderfit$min_aBIC[run] <- p}
+        p <- subdat[which.min(subdat$AIC3), ]$Profiles
+        if (length(p) > 0){overunderfit$min_AIC3[run] <- p}
+        p <- subdat[which.min(subdat$CAIC), ]$Profiles
+        if (length(p) > 0){overunderfit$min_CAIC[run] <- p}
+        run <- run + 1
+      }
+    }
+
+overunderfit <- overunderfit[complete.cases(overunderfit),]
+
+overunderfit_long <- overunderfit %>%
+  #  filter(ComboSize == 3 | ComboSize == 3) %>%
+  pivot_longer(c("min_AIC", "min_BIC", "min_aBIC", "min_AIC3", "min_CAIC"), names_to = "Index", values_to = "value")
+
+
+overunderfit_long$value <- as.numeric(as.character(overunderfit_long$value))
+overunderfit_long$Sample <- as.factor(overunderfit_long$Sample)
+overunderfit_long$Sample <- fct_relevel(overunderfit_long$Sample, "250", "260", "270", "280", "290", "300", "310", "320", "330", "340", "350", "360", "370", "380", "390", "400", "410", "420", "430", "440", "450", "460", "470", "480", "490", "500", "510", "520", "530", "540", "550", "560", "570", "580", "590", "600", "610", "620", "630", "640", "650", "660", "670", "680", "690", "700", "710", "720", "730", "740", "750")
+
+overunderfit_long$correct <- ifelse(overunderfit_long$value == 5, 1, 0) ## Wenn value=5 ist, also 5 Profile identifiziert wurden, wird correct auf 1 gesetzt
+overunderfit_long_backup <- overunderfit_long
+
+labels.index <- c(min_AIC = "AIC",
+                  min_BIC = "BIC",
+                  min_aBIC = "aBIC",
+                  min_AIC3 = "AIC3",
+                  min_CAIC = "CAIC")
+
+################### Figure preparation - accuracy #######################################
+
+labels_sample <- c("250" = "N = 250", "260" = "N = 260", "270" = "N = 270", "280" = "N = 280", "290" = "N = 290", "300" = "N = 300", "310" = "N = 310", "320" = "N = 320", "330" = "N = 330", "340" = "N = 340", "350" = "N = 350", "360" = "N = 360", "370" = "N = 370", "380" = "N = 380", "390" = "N = 390", "400" = "N = 400", "410" = "N = 410", "420" = "N = 420", "430" = "N = 430", "440" = "N = 440", "450" = "N = 450", "460" = "N = 460", "470" = "N = 470", "480" = "N = 480", "490" = "N = 490", "500" = "N = 500", "510" = "N = 510", "520" = "N = 520", "530" = "N = 530", "540" = "N = 540", "550" = "N = 550", "560" = "N = 560", "570" = "N = 570", "580" = "N = 580", "590" = "N = 590", "600" = "N = 600", "610" = "N = 610", "620" = "N = 620", "630" = "N = 630", "640" = "N = 640", "650" = "N = 650", "660" = "N = 660", "670" = "N = 670", "680" = "N = 680", "690" = "N = 690", "700" = "N = 700", "710" = "N = 710", "720" = "N = 720", "730" = "N = 730", "740" = "N = 740", "750" = "N = 750")
+
+# Figure: Accuracy
+
+# Update the `overunderfit_long` DataFrame to replace "min_" with empty string in the Index column
+overunderfit_long$Index <- gsub("^min_", "", overunderfit_long$Index)
+
+# Redefine the labels for the fit indices without the "min_" prefix
+labels.index <- c(AIC = "AIC",
+                  BIC = "BIC",
+                  aBIC = "aBIC",
+                  AIC3 = "AIC3",
+                  CAIC = "CAIC")
+
+# Plot with updated facet labels and legend labels
+ggplot(overunderfit_long, aes(x = Index, y = correct * 100, group = Index)) +
+  # Create bar plots showing the percentage of correctly identified models (correct * 100)
+  stat_summary(mapping = aes(group = Index, fill = Index), fun = mean, geom = "bar", color = "black", size = 1) +
+  # Use facet_wrap to create separate plots for each sample size, organized in 3 rows and 17 columns
+  facet_wrap(~ Sample, nrow = 3, ncol = 17, scales = "free_y", labeller = labeller(Index = labels.index)) +
+  # Apply a custom color palette (all grey shades) to the different fit indices
+  scale_fill_manual(
+    values = c("grey0", "grey25", "grey50", "grey75", "grey100"),
+    labels = labels.index  # Custom labels for the legend
+  ) +
+  # Set the label for the y-axis
+  ylab("% correctly identified model (5 profiles)") +
+  # Customize the y-axis labels to include a "%" symbol
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  # Set the legend title to "Fit index" with the correct names
+  labs(fill = "Fit index") +
+  # Add a solid horizontal line at y = 50%
+  geom_hline(yintercept = 50, linetype = "solid", color = "grey25") +
+  # Add dashed horizontal lines at y = 33% and y = 66%
+  geom_hline(yintercept = 33, linetype = "dashed", color = "grey25") +
+  geom_hline(yintercept = 66, linetype = "dashed", color = "grey25") +
+  # Customize the x-axis text: rotate it, adjust size, and align it
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+  # Adjust the text size of the facet labels
+    strip.text.x = element_text(size = 8),
+  # Remove the background of the facet labels
+  strip.background = element_blank(),
+  # Remove the x-axis title (if needed)
+  axis.title.x = element_blank(),
+  # Adjust the text size of the y-axis ticks
+    axis.text.y = element_text(size = 8),
+  # Optionally: Add grid lines for major y-axis ticks
+    panel.grid.major.y = element_line(color = "grey90"),
+  # Place the facet labels outside the plot area (only display fit index labels below)
+    strip.placement = "outside"
+  )
+
+ggsave("fitpower_2024-09-17.png", width = 18.5, height = 8, dpi = 600)
+
+################### Logistic regression and figure for model fit visualization #######################
+
+# Convert 'Sample' from a factor to a numeric variable
+overunderfit_long$Sample <- as.numeric(as.character(overunderfit_long$Sample))
+
+# Create a list of subsets for each fit index
+index_values <- unique(overunderfit_long$Index)
+subdata_list <- list()
+
+for (idx in index_values) {
+  subdata_list[[idx]] <- subset(overunderfit_long, Index == idx)
+}
+
+# Initialize an empty list to store the models
+models_list <- list()
+
+# Run a logistic regression for each subset
+for (idx in index_values) {
+  subdata <- subdata_list[[idx]]
+  
+  # Check if the subset contains data
+  if (nrow(subdata) > 0) {
+    # Logistic regression with 'Sample' as a numeric variable
+    logistic_model <- glm(correct ~ Sample, 
+                          data = subdata, 
+                          family = binomial())
+    
+    # Store the model in the list
+    models_list[[idx]] <- logistic_model
+    
+    # Optional: Print the model summary
+    cat("\nSummary for Index:", idx, "\n")
+    print(summary(logistic_model))
+  } else {
+    cat("\nNo data for Index:", idx, "\n")
+  }
+}
+
+##### Summary of results #############################
+
+# Empty list to store the predictions
+predictions_list <- list()
+
+# Calculate the predicted probabilities for each fit index
+for (idx in index_values) {
+  subdata <- subdata_list[[idx]]
+  
+  # Check if there is a model for this index
+  if (!is.null(models_list[[idx]])) {
+    model <- models_list[[idx]]
+    
+    # Generate predictions for each sample size
+    subdata$predicted_prob <- plogis(predict(model, newdata = subdata, type = "link"))
+    
+    # Store the predictions in the list
+    predictions_list[[idx]] <- subdata
+  }
+}
+
+# Combine all predictions into a single DataFrame for plotting
+predictions_df <- do.call(rbind, predictions_list)
+
+# Define the labels for the indices without the "min_" prefix
+labels.index <- c(min_AIC = "AIC",
+                  min_BIC = "BIC",
+                  min_aBIC = "aBIC",
+                  min_AIC3 = "AIC3",
+                  min_CAIC = "CAIC")
+
+# Plot der vorhergesagten Wahrscheinlichkeiten für jeden Fit-Index mit angepasster Legende - bunt
+ggplot(predictions_df, aes(x = Sample, y = predicted_prob, color = Index)) +
+  geom_line(size = 1.2) + 
+  labs(title = "Wahrscheinlichkeit der korrekten Modellidentifikation",
+       x = "Stichprobengröße",
+       y = "Wahrscheinlichkeit der korrekten Identifikation") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  theme(legend.position = "bottom") +
+  scale_color_discrete(labels = labels.index)
+
+# Plot predicted probabilities for each fit index with customized legend
+ggplot(predictions_df, aes(x = Sample, y = predicted_prob, linetype = Index, color = Index)) +
+  geom_line(size = 1.2) +  # Use varying colors for the lines
+  geom_point(aes(shape = Index), size = 4) +  # Add different shapes for each index
+  labs(title = "Probability of Correct Model Identification",
+       x = "Sample Size",
+       y = "Probability of Correct Identification") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +  # Format y-axis labels as percentages
+  theme(
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "white"),  # Set background color to white
+    plot.background = element_rect(fill = "white")    # Set plot background color to white
+  ) +
+  scale_color_manual(values = c("black", "grey20", "grey40", "grey60", "grey80"), 
+                     labels = labels.index) +  # Use various shades of grey for the lines
+  scale_linetype_manual(values = c("solid", "dashed", "dotted", "dotdash", "longdash"), 
+                        labels = labels.index) +  # Set different linetypes for each index
+  scale_shape_manual(values = c(16, 17, 18, 19, 15),  # Different shapes: circles, triangles, squares, etc.
+                     labels = labels.index) +  # Same labels for linetypes and shapes
+  geom_hline(yintercept = 0.8, linetype = "dashed", color = "grey50") +  # Add dashed line at 80%
+  geom_hline(yintercept = 0.5, linetype = "solid", color = "grey50")  # Keep the line at 50%
+
+ggsave("logreg_2024-09-17.png", width = 18.5, height = 8, dpi = 600)
+
+
+########################################################################################
+
+
+
+
+# overunderfit_long$Attrition <- as.factor(overunderfit_long$Attrition)
+# overunderfit_long$Attrition <- fct_relevel(overunderfit_long$Attrition, "noattrition",
+#                                            "attrition")
+# overunderfit_long$Entropy <- as.factor(overunderfit_long$Entropy)
+# overunderfit_long$Entropy <- fct_relevel(overunderfit_long$Entropy,
+#                                          "16",
+#                                          "25",
+#                                          "36")
+# overunderfit_long$Entropy <- fct_recode(overunderfit_long$Entropy,
+#                                         "low (.73)" = "16",
+#                                         "medium (.82)" = "25",
+#                                         "high (.87)" = "36")
+
+
+# Figures: Preprations
+
+#labels_entropy <- c("low (.73)" = "Low entropy (.73)",
+#                    "medium (.82)" = "Medium entropy (.82)",
+#                    "high (.87)" = "High entropy (.87)")
+
+#labels_attrition <- c(noattrition = "no attrition",
+#                      attrition = "attrition (10%/wave)")
+
+
+####################################################
+
+
+```
